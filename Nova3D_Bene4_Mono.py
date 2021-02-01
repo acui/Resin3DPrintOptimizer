@@ -101,7 +101,7 @@ class Bene4MonoOptimizer:
         self.machine_status = 'init'
         self.base_name = ''
 
-    def optimize(self, filename):
+    def optimize(self, filename, outputfilename):
         self.reset()
         with open(filename, 'rb') as ifs:
             self.cwsfile = zipfile.ZipFile(ifs)
@@ -117,10 +117,10 @@ class Bene4MonoOptimizer:
                     self.speeds.append(self._calculate_layer(file))
             self.done = True
             self.base_name = os.path.splitext(filename)[0]
-            self._write(self.cwsfile)
+            self._write(outputfilename, self.cwsfile)
 
-    def _write(self, source):
-        output_filename = '{}_new.CWS'.format(self.base_name)
+    def _write(self, outputfilename, source):
+        output_filename = outputfilename
         with zipfile.ZipFile(output_filename, 'w',
                              zipfile.ZIP_DEFLATED) as zfile:
             with zfile.open(self.gcode_filename, 'w') as ofs:
@@ -388,10 +388,17 @@ def draw_boolean_image(img):
         axes=True, frame=True, figsize=8, aspect_ratio=1)
 
 
-# In[133]:
-
-o = Bene4MonoOptimizer()
-
-# In[134]:
-
-o.optimize("3dprinttest.CWS")
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Optimize the lift speed of each layers')
+    parser.add_argument(
+        'input',
+        metavar='input',
+        type=str,
+        help='file that need to be optimized')
+    parser.add_argument(
+        'output', metavar='output', type=str, help='optimized file')
+    args = parser.parse_args()
+    o = Bene4MonoOptimizer()
+    o.optimize(args.input, args.output)
