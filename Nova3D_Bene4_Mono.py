@@ -74,10 +74,10 @@ class Bene4MonoOptimizer:
         self.cwsfile = None
         self.files = None
         self.support = None
-        self.thickness = int(50)
-        self.support_layers = int(1000 / 50)
-        self.max_speed = int(120)
-        self.max_speed_area = int(600 * 600)
+        self.thickness = -1
+        self.max_thickness = 5000
+        self.max_speed = -1
+        self.max_speed_area = int(300 * 300)
         self.min_speed = int(6)
         self.current_layer = 0
         self.done = False
@@ -112,12 +112,17 @@ class Bene4MonoOptimizer:
                     self.gcode_filename = file.filename
                     self._read_gcode_file(file)
                     break
+            self.support_layers = self.max_thickness / self.thickness
+            self.max_speed = self.normal_down
             for file in self.files:
                 if os.path.splitext(file.filename)[1].upper() == ".PNG":
                     self.speeds.append(self._calculate_layer(file))
             self.done = True
             self.base_name = os.path.splitext(filename)[0]
-            self._write(outputfilename, self.cwsfile)
+            if outputfilename is None:
+                print(self.gen_output())
+            else:
+                self._write(outputfilename, self.cwsfile)
 
     def _write(self, outputfilename, source):
         output_filename = outputfilename
@@ -224,11 +229,9 @@ class Bene4MonoOptimizer:
                             self.bottom_down = speed
                 else:
                     if height > 0:
-                        if self.normal_lift < 0:
-                            self.normal_lift = speed
+                        self.normal_lift = max(self.normal_lift, speed)
                     else:
-                        if self.normal_down < 0:
-                            self.normal_down = speed
+                        self.normal_down = max(self.normal_down, speed)
         elif self.machine_status == 'finishing':
             if key == ';<Completed>':
                 self.machine_status = 'finished'
@@ -314,9 +317,9 @@ G1 Z{down_distance:0.3f} F{speed}
 
         result += """M18 ;Disable Motors
 M106 SO
-G1 Z80
+G1 Z80 F{speed}
 ;<Completed>
-"""
+""".format(speed=self.normal_lift)
         return result
 
     def _calculate_layer(self, file_info):
@@ -354,12 +357,12 @@ G1 Z80
             has_support = cv2.dilate(
                 np.array(has_support, dtype=np.uint8),
                 self.kernel,
-                iterations=int(10)) * area
+                iterations=int(5)) * area
             area_test -= has_support * area_test
             while (np.any(area_test > 0)):
                 has_support = cv2.dilate(has_support, self.kernel) * area
-                distance_speed = distance_speed * radius * radius / (
-                    (radius + int(10)) * (radius + int(10)))
+                scale = float(radius) / float(radius + int(10))
+                distance_speed = distance_speed * (scale**int(4))
                 area_test -= has_support * area_test
                 radius += 10
             speed = min(speed, area_speed, distance_speed)
@@ -391,14 +394,21 @@ def draw_boolean_image(img):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(
-        description='Optimize the lift speed of each layers')
+        description=
+        'Optimize the lift speed of each layers. If no output file is given, will print the gcode.'
+    )
     parser.add_argument(
         'input',
         metavar='input',
         type=str,
         help='file that need to be optimized')
     parser.add_argument(
-        'output', metavar='output', type=str, help='optimized file')
+        '-o',
+        '--output',
+        metavar='output',
+        default=None,
+        type=str,
+        help='optimized file')
     args = parser.parse_args()
     o = Bene4MonoOptimizer()
     o.optimize(args.input, args.output)
