@@ -10,6 +10,7 @@ import os.path
 import decimal
 import re
 import math
+import datetime
 
 # In[2]:
 
@@ -237,6 +238,7 @@ class Bene4MonoOptimizer:
                 self.machine_status = 'finished'
 
     def gen_output(self):
+        total_time = 0
         result = ""
         for header in self.gcode_headers:
             result += header
@@ -282,6 +284,7 @@ G1 Z{down_distance:0.3f} F{bottom_down}
                     bottom_move_delay
                 })
             result += '\n'
+            total_time += self.bottom_time + bottom_move_delay
 
         for i in range(self.bottom_count, self.layers):
             speed = max(self.min_speed, int(self.speeds[i]))
@@ -314,12 +317,15 @@ G1 Z{down_distance:0.3f} F{speed}
                     move_delay
                 })
             result += '\n'
+            total_time += self.normal_time + move_delay
 
         result += """M18 ;Disable Motors
 M106 SO
 G1 Z80 F{speed}
 ;<Completed>
 """.format(speed=self.normal_lift)
+        total_time = datetime.timedelta(milliseconds=total_time)
+        print(";total time: {time}".format(time=str(total_time)))
         return result
 
     def _calculate_layer(self, file_info):
@@ -369,7 +375,7 @@ G1 Z80 F{speed}
             # print("file: " + str(file_info.filename) + "\tarea: " + str(i) + "\tspeed: " + str(speed) + "\tarea_speed: " + str(area_speed) + "\tdistance_speed: " + str(distance_speed))
         self.support = new_support
         self.current_layer += 1
-        print("done processing " + str(self.current_layer))
+        print(";done processing " + str(self.current_layer))
         return speed
 
 
