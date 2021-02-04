@@ -368,7 +368,7 @@ G1 Z80 F{speed}
             while (np.any(area_test > 0)):
                 has_support = cv2.dilate(has_support, self.kernel) * area
                 scale = float(radius) / float(radius + int(10))
-                distance_speed = distance_speed * (scale**int(4))
+                distance_speed = distance_speed * (scale**int(5))
                 area_test -= has_support * area_test
                 radius += 10
             speed = min(speed, area_speed, distance_speed)
